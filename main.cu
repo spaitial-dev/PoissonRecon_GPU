@@ -3244,12 +3244,14 @@ __host__ void insertTriangle(Point3D<float> *VertexBuffer,const int &allVexNums,
     }
 }
 
-int main() {
-//    char fileName[]="/home/davidxu/horse.npts";
-//    char outName[]="/home/davidxu/horse.ply";
+int main(int argc, char** argv) {
+    if (argc != 3) {
+        fprintf(stderr, "Usage: %s <input.ply> <output.ply>\n", argv[0]);
+        return 1;
+    }
 
-    char fileName[]="/home/davidxu/bunny.points.ply";
-    char outName[]="/home/davidxu/bunny.ply";
+    char* fileName = argv[1];
+    char* outName = argv[2];
 
 //    char fileName[]="/home/davidxu/eagle.points.ply";
 //    char outName[]="/home/davidxu/eagle.ply";
