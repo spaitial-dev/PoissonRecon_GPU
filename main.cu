@@ -66,7 +66,7 @@ __global__ void outputDeviceArray(float *d_addr,int size) {
 //__constant__ float ROUND_EPS=float(1e-5);
 #define ROUND_EPS float(1e-5)
 //__constant__ int maxDepth=9;
-#define maxDepth 8
+#define maxDepth 10
 //__constant__ int markOffset=31;
 #define markOffset 31
 //__constant__ int resolution=1023;
