@@ -3755,14 +3755,9 @@ int main(int argc, char** argv) {
     int validVexAddress_sz = validVexAddress_end - validVexAddress_ptr;
     assert(allVexNums == validVexAddress_sz);
 
-    // BUGFIX: original line was `grid = (std::min(allVexNums/1024, 32),
-    // allVexNums/32768);`, which is the C comma operator — result was
-    // `dim3(allVexNums/32768, 1, 1)`. For any input where allVexNums < 32768
-    // the grid evaluated to dim3(0,1,1), and the kernel launched with
-    // `cudaErrorInvalidConfiguration` (code 9), set as a sticky last-error
-    // that surfaced much later inside thrust::copy_if as a confusing
-    // "invalid device ordinal" / system_error abort. Use a fixed grid that
-    // matches the stride-loop pattern used throughout the rest of this file.
+    // Fixed grid matches the stride-loop pattern used elsewhere; the kernel
+    // walks [offset, validEdgeArray_sz). Don't replace with a workload-sized
+    // grid without bounds-checking — see commit 180a5f7 for the bug history.
     grid = dim3(32, 1, 1);
     generateIntersectionPoint<<<grid,block>>>(validEdgeArray,allVexNums,
                                               VertexArray,NodeArray,

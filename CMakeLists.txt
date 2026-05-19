@@ -2,23 +2,13 @@ cmake_minimum_required(VERSION 3.22)
 
 set(CMAKE_CUDA_COMPILER "/usr/local/cuda/bin/nvcc")
 
-# IMPORTANT: CMAKE_CUDA_ARCHITECTURES MUST be set BEFORE project(... CUDA)
-# is called. CMake 3.18+ auto-detects/defaults this during the CUDA language
-# enable step inside project(), and once it's defined a guard like
-# `if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)` will silently no-op. The
-# previous fix had this set AFTER project() with a NOT-DEFINED guard, which
-# meant CMake's default of sm_52 was used — producing a PTX-only binary
-# that JIT'd to runtime arch and silently misbehaved inside CUB's
-# DeviceSelect on T4 (sm_75) and L4 (sm_89), surfacing as a confusing
-# `cudaErrorInvalidDevice` from `thrust::copy_if`.
-#
-# Compile real SASS for every modern NVIDIA arch we ship on (T4 sm_75 ..
-# H100 sm_90) plus a PTX-only entry for sm_90 so the driver can JIT for
-# any future arch >= 9.0. Override via CLI:
+# Must be set BEFORE project(... CUDA) — CMake 3.18+ auto-defaults this
+# during the language enable step, so a `NOT DEFINED` guard placed after
+# project() silently no-ops. Override via:
 #   cmake .. -DCMAKE_CUDA_ARCHITECTURES="80-real"
 if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES OR CMAKE_CUDA_ARCHITECTURES STREQUAL "")
     set(CMAKE_CUDA_ARCHITECTURES 70-real 75-real 80-real 86-real 89-real 90-real 90-virtual
-        CACHE STRING "CUDA architectures to compile SASS+PTX for" FORCE)
+        CACHE STRING "CUDA archs (SASS for sm_70..sm_90 + PTX for >=9.0)" FORCE)
 endif()
 
 project(GPU_PoissonRecon LANGUAGES CXX CUDA)
