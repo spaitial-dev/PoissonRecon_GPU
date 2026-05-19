@@ -3755,14 +3755,22 @@ int main(int argc, char** argv) {
     int validVexAddress_sz = validVexAddress_end - validVexAddress_ptr;
     assert(allVexNums == validVexAddress_sz);
 
-    grid = (std::min(allVexNums / 1024 , 32) ,allVexNums/32768);
+    // BUGFIX: original line was `grid = (std::min(allVexNums/1024, 32),
+    // allVexNums/32768);`, which is the C comma operator — result was
+    // `dim3(allVexNums/32768, 1, 1)`. For any input where allVexNums < 32768
+    // the grid evaluated to dim3(0,1,1), and the kernel launched with
+    // `cudaErrorInvalidConfiguration` (code 9), set as a sticky last-error
+    // that surfaced much later inside thrust::copy_if as a confusing
+    // "invalid device ordinal" / system_error abort. Use a fixed grid that
+    // matches the stride-loop pattern used throughout the rest of this file.
+    grid = dim3(32, 1, 1);
     generateIntersectionPoint<<<grid,block>>>(validEdgeArray,allVexNums,
                                               VertexArray,NodeArray,
                                               validVexAddress,vvalue,
                                               VertexBuffer);
-    cudaDeviceSynchronize();
+    LAUNCH_CHECK("generateIntersectionPoint");
 
-    grid = (32,32);
+    grid = dim3(32, 1, 1);
 
     double mid12=cpuSecond();
     printf("Generate interpolate vertices takes:%lfs\n",mid12-mid11);
