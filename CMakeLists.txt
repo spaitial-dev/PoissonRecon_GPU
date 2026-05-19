@@ -12,6 +12,16 @@ set(CMAKE_CUDA_STANDARD 14)
 
 find_package(CUDA 11.7 REQUIRED)
 
+# Compile SASS for every modern NVIDIA arch we ship on (T4 sm_75 .. H100 sm_90)
+# plus a PTX-only entry for sm_90 so the driver can JIT for any future arch
+# >= 9.0. The previous hardcoded `-arch=sm_80` produced a binary that only ran
+# on Ampere A100, and silently crashed with thrust system_errors (mapped to
+# cudaErrorInvalidDevice / "no kernel image" on every other GPU.
+# Override at configure time with e.g. -DCMAKE_CUDA_ARCHITECTURES="80-real".
+if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+    set(CMAKE_CUDA_ARCHITECTURES 70-real 75-real 80-real 86-real 89-real 90-real 90-virtual)
+endif()
+
 add_executable(GPU_PoissonRecon main.cu
         CmdLineParser.cuh CmdLineParser.inl CmdLineParser.cu
         Geometry.cuh Geometry.inl Geometry.cu
@@ -30,8 +40,9 @@ add_executable(GPU_PoissonRecon main.cu
         helper_cuda.h helper_image.h helper_timer.h helper_string.h helper_functions.h MarchingCubes.cuh)
 
 set_target_properties(GPU_PoissonRecon PROPERTIES
-        CUDA_SEPARABLE_COMPILATION ON)
+        CUDA_SEPARABLE_COMPILATION ON
+        CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES}")
 
 target_link_libraries( GPU_PoissonRecon ${CUDA_cusparse_LIBRARY} ${CUDA_cusolver_LIBRARY} ${CUDA_cublas_LIBRARY})
 
-target_compile_options(GPU_PoissonRecon PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-arch=sm_80>)
+message(STATUS "GPU_PoissonRecon CUDA Architectures: ${CMAKE_CUDA_ARCHITECTURES}")
