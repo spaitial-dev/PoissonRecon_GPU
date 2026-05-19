@@ -2549,9 +2549,20 @@ __global__ void generateTriNums(OctNode *NodeArray,
     for(int i=offset;i<right;i+=stride){
         OctNode nowNode=NodeArray[i];
         int nowCubeCatagory=0;
+        // OctNode::vertices uses (real_idx + 1) with 0 == empty slot; reading
+        // vvalue[-1] for empty slots was causing illegal memory access (XID 31
+        // MMU faults) for clouds whose array placement put offset -1 into an
+        // unmapped page. If any of the 8 corner vertices is missing the cube
+        // can't have a valid surface crossing, so emit zero triangles.
+        bool hasAllVerts = true;
         for(int j=0;j<8;++j){
-            if(vvalue[nowNode.vertices[j]-1] < 0){
-                nowCubeCatagory |= 1<<j;
+            if(nowNode.vertices[j] <= 0){ hasAllVerts = false; break; }
+        }
+        if (hasAllVerts) {
+            for(int j=0;j<8;++j){
+                if(vvalue[nowNode.vertices[j]-1] < 0){
+                    nowCubeCatagory |= 1<<j;
+                }
             }
         }
         triNums[i-left]=trianglesCount[nowCubeCatagory];
@@ -2571,9 +2582,15 @@ __global__ void generateTriNums(EasyOctNode *NodeArray,
     for(int i=offset;i<right;i+=stride){
         EasyOctNode nowNode=NodeArray[i];
         int nowCubeCatagory=0;
+        bool hasAllVerts = true;
         for(int j=0;j<8;++j){
-            if(vvalue[nowNode.vertices[j]-1] < 0){
-                nowCubeCatagory |= 1<<j;
+            if(nowNode.vertices[j] <= 0){ hasAllVerts = false; break; }
+        }
+        if (hasAllVerts) {
+            for(int j=0;j<8;++j){
+                if(vvalue[nowNode.vertices[j]-1] < 0){
+                    nowCubeCatagory |= 1<<j;
+                }
             }
         }
         triNums[i-left]=trianglesCount[nowCubeCatagory];
@@ -2964,19 +2981,32 @@ __global__ void ProcessLeafNodesAtOtherDepth(OctNode *NodeArray,int left,int rig
     offset+=left;
     for(int i=offset;i<right;i+=stride){
         OctNode nowNode = NodeArray[i];
+        // vertices[]/faces[] use (real_idx + 1) with 0 == empty slot. Reading
+        // vvalue[-1] / hasSurfaceIntersection[-1] on empty slots was causing
+        // XID 31 MMU faults (cudaErrorIllegalAddress) for certain inputs
+        // depending on where cudaMalloc placed those buffers in virtual
+        // memory. Skip empty slots; treat a node missing its anchor (slot 0)
+        // as having no surface.
         int hasTri=0;
-        int sign = (vvalue[nowNode.vertices[0]-1] < 0 )? -1:1;
-        for(int j=1;j<8;++j){
-            if(sign * vvalue[nowNode.vertices[j]-1] < 0) {
-                hasTri=1;
-                break;
+        int v0 = nowNode.vertices[0];
+        if (v0 > 0) {
+            int sign = (vvalue[v0-1] < 0) ? -1 : 1;
+            for(int j=1;j<8;++j){
+                int vj = nowNode.vertices[j];
+                if (vj <= 0) continue;
+                if(sign * vvalue[vj-1] < 0) {
+                    hasTri=1;
+                    break;
+                }
             }
         }
         NodeArray[i].hasTriangle=hasTri;
 
         int hasIntersection=0;
         for(int j=0;j<6;++j){
-            if(hasSurfaceIntersection[nowNode.faces[j]-1]){
+            int fj = nowNode.faces[j];
+            if (fj <= 0) continue;
+            if(hasSurfaceIntersection[fj-1]){
                 hasIntersection=1;
                 break;
             }
