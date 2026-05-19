@@ -3787,7 +3787,6 @@ int main(int argc, char** argv) {
     CHECK(cudaMallocManaged((int**)&TriangleBuffer,nByte));
 //    CHECK(cudaMemset(TriangleBuffer,0,nByte));
 
-    PROBE_STALE("before generateTrianglePos");
     generateTrianglePos<<<grid,block>>>(NodeArray,BaseAddressArray[maxDepth_h],NodeArray_sz,
                                         triNums,cubeCatagory,
                                         vexAddress,
@@ -3805,8 +3804,6 @@ int main(int argc, char** argv) {
                    TriangleBuffer,allTriNums,
                    mesh);
 
-    PROBE_STALE("after insertTriangle (host-only fn)");
-
     // ----------------------------------------------------
 
     ProcessLeafNodesAtOtherDepth<<<grid,block>>>(NodeArray,0,BaseAddressArray[maxDepth_h],
@@ -3814,35 +3811,20 @@ int main(int argc, char** argv) {
                                                  hasSurfaceIntersection);
     LAUNCH_CHECK("ProcessLeafNodesAtOtherDepth");
 
-    PROBE_STALE("before cudaFree storm");
-    fprintf(stderr,"[diag] freeing VertexArray=%p\n", (void*)VertexArray); fflush(stderr);
     CHECK(cudaFree(VertexArray));
-    fprintf(stderr,"[diag] freeing EdgeArray=%p\n", (void*)EdgeArray); fflush(stderr);
     CHECK(cudaFree(EdgeArray));
-    fprintf(stderr,"[diag] freeing FaceArray=%p\n", (void*)FaceArray); fflush(stderr);
     CHECK(cudaFree(FaceArray));
-    fprintf(stderr,"[diag] freeing hasSurfaceIntersection=%p\n", (void*)hasSurfaceIntersection); fflush(stderr);
     CHECK(cudaFree(hasSurfaceIntersection));
 //    cudaFree(vvalue);
-    fprintf(stderr,"[diag] freeing vexNums=%p\n", (void*)vexNums); fflush(stderr);
     CHECK(cudaFree(vexNums));
-    fprintf(stderr,"[diag] freeing vexAddress=%p\n", (void*)vexAddress); fflush(stderr);
     CHECK(cudaFree(vexAddress));
-    fprintf(stderr,"[diag] freeing triNums=%p\n", (void*)triNums); fflush(stderr);
     CHECK(cudaFree(triNums));
-    fprintf(stderr,"[diag] freeing cubeCatagory=%p\n", (void*)cubeCatagory); fflush(stderr);
     CHECK(cudaFree(cubeCatagory));
-    fprintf(stderr,"[diag] freeing triAddress=%p\n", (void*)triAddress); fflush(stderr);
     CHECK(cudaFree(triAddress));
-    fprintf(stderr,"[diag] freeing VertexBuffer=%p\n", (void*)VertexBuffer); fflush(stderr);
     CHECK(cudaFree(VertexBuffer));
-    fprintf(stderr,"[diag] freeing TriangleBuffer=%p\n", (void*)TriangleBuffer); fflush(stderr);
     CHECK(cudaFree(TriangleBuffer));
-    fprintf(stderr,"[diag] freeing validEdgeArray=%p\n", (void*)validEdgeArray); fflush(stderr);
     CHECK(cudaFree(validEdgeArray));
-    fprintf(stderr,"[diag] freeing validVexAddress=%p\n", (void*)validVexAddress); fflush(stderr);
     CHECK(cudaFree(validVexAddress));
-    PROBE_STALE("after cudaFree storm");
 
 
     // ----------------------------------------------------
@@ -3850,24 +3832,15 @@ int main(int argc, char** argv) {
 
     OctNode *SubdivideNode=NULL;
     nByte = 1ll * sizeof(OctNode) * BaseAddressArray[maxDepth_h];
-    fprintf(stderr,"[diag] BaseAddressArray[maxDepth_h]=%d  sizeof(OctNode)=%zu  nByte=%lld\n",
-            BaseAddressArray[maxDepth_h],sizeof(OctNode),(long long)nByte);
-    fflush(stderr);
-    PROBE_STALE("immediately before SubdivideNode cudaMalloc");
     CHECK(cudaMalloc((OctNode**)&SubdivideNode,nByte));
-    fprintf(stderr,"[diag] SubdivideNode malloc ok, ptr=%p\n", (void*)SubdivideNode); fflush(stderr);
     CHECK(cudaMemset(SubdivideNode,0,nByte));
-    PROBE_STALE("after SubdivideNode malloc+memset");
     thrust::device_ptr<OctNode> NodeArray_ptr=thrust::device_pointer_cast<OctNode>(NodeArray);
     thrust::device_ptr<OctNode> SubdivideNode_ptr=thrust::device_pointer_cast<OctNode>(SubdivideNode);
-    fprintf(stderr,"[diag] about to thrust::copy_if NodeArray_ptr[0..%d) -> SubdivideNode (NodeArray_sz=%d)\n",
-            BaseAddressArray[maxDepth_h], NodeArray_sz);
-    fflush(stderr);
     thrust::device_ptr<OctNode> SubdivideNode_end=thrust::copy_if(NodeArray_ptr,NodeArray_ptr+BaseAddressArray[maxDepth_h],SubdivideNode_ptr,ifSubdivide());
     cudaError_t _copy_if_err = cudaDeviceSynchronize();
     if (_copy_if_err != cudaSuccess) {
-        fprintf(stderr,"\n[copy_if FAIL] code=%d reason=%s\n",
-                (int)_copy_if_err, cudaGetErrorString(_copy_if_err));
+        fprintf(stderr,"[CUDA-CHECK FAIL] %s:%d  thrust::copy_if (SubdivideNode)  code=%d  reason=%s\n",
+                __FILE__,__LINE__,(int)_copy_if_err, cudaGetErrorString(_copy_if_err));
         fflush(stderr);
         abort();
     }
